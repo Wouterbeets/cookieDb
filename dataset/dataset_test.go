@@ -19,7 +19,7 @@ func TestParse(t *testing.T) {
 	r2 := bufio.NewScanner(f2)
 	testCases := []struct {
 		data *bufio.Scanner
-		d    Dataset
+		d    Shard
 	}{
 		{
 			data: r,
@@ -31,7 +31,7 @@ func TestParse(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		d := fillDb(test.data, test.d)
+		d := FillDb(test.data, test.d)
 		if d.Size() == 0 {
 			t.Error("failed for test", test, i)
 		}
