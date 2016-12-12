@@ -84,6 +84,25 @@ func (s *dataset) countTime() []cookieDb.CountTime {
 	return ct
 }
 
+func (s *dataset) countTimeCats() []cookieDb.CountTimeCats {
+	ct := make([]cookieDb.CountTimeCats, s.sampleSize)
+	for _, shard := range s.shards {
+		s.loadShard(shard)
+		for i, cookie := range s.sample {
+			if c := s.loadedShard.Get(cookie.Id()); c != nil {
+				ct[i].Counter += c.Count()
+				ct[i].TStamp = append(ct[i].TStamp, c.Time()...)
+				ct[i].Categories = append(ct[i].Categories, c.Cats()...)
+				ct[i].CookieId = cookie.Id()
+				log.Println("shard:", shard, &ct[i], "|", c)
+			}
+		}
+	}
+	return ct
+}
+
+var errors *log.Logger
+
 func main() {
 	flag.Parse()
 	interFileNames := []string{}
@@ -113,7 +132,15 @@ func main() {
 	}
 	set := makeShards(datasetFileNames, d)
 	set.setSample(*sampleSize)
-	set.countTime()
+	c := set.countTimeCats()
+	f, err := os.Create("output.txt")
+	if err != nil {
+		errors.Fatal(err)
+	}
+	out := log.New(f, "", 0)
+	for _, s := range c {
+		out.Println(&s)
+	}
 }
 
 func shardAlreadyMade(shardName string) bool {
@@ -139,7 +166,6 @@ func makeShards(fileNames []string, d cookieDb.Shard) (set *dataset) {
 			} else {
 				set.shards = append(set.shards, shardName)
 			}
-			fmt.Println(d.Size())
 			d.Init()
 		} else {
 			set.shards = append(set.shards, shardName)
@@ -158,4 +184,12 @@ func fromDir(dir string) []string {
 		filePaths = append(filePaths, dir+"/"+fileInfo.Name())
 	}
 	return filePaths
+}
+
+func init() {
+	f, err := os.Create("error.log")
+	if err != nil {
+		panic(err)
+	}
+	errors = log.New(f, "ERROR:", log.Lshortfile)
 }

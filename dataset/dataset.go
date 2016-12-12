@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/segmentio/objconv/bytesconv"
@@ -28,6 +29,7 @@ type Cookie interface {
 	Count() int
 	Time() []time.Time
 	Cats() []string
+	Hist() bool
 }
 
 type cookieInter string
@@ -50,6 +52,10 @@ func (c cookieInter) Cats() []string {
 
 func (c cookieInter) Time() []time.Time {
 	return nil
+}
+
+func (c cookieInter) Hist() bool {
+	return false
 }
 
 type cookieCountTime struct {
@@ -77,6 +83,10 @@ func (c cookieCountTime) Time() []time.Time {
 	return c.Ct.TStamp
 }
 
+func (c cookieCountTime) Hist() bool {
+	return false
+}
+
 type CountTimeCats struct {
 	Counter    int
 	TStamp     []time.Time
@@ -88,6 +98,10 @@ func (c *CountTimeCats) Count() int {
 	return c.Counter
 }
 
+func (c *CountTimeCats) Hist() bool {
+	return false
+}
+
 func (c *CountTimeCats) Time() []time.Time {
 	return c.TStamp
 }
@@ -97,21 +111,55 @@ func (c *CountTimeCats) Id() string {
 }
 
 func (c *CountTimeCats) String() string {
-	return fmt.Sprint(c.CookieId, c.Counter, c.TStamp, c.Categories)
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		panic(err)
+	}
+	s := "["
+	for _, t := range c.TStamp {
+		s += t.In(loc).Format(time.Stamp) + ", "
+	}
+	s += "]"
+	return fmt.Sprint(len(c.Categories), "\t", c.CookieId, "\t", c.Categories, "\t", c.Counter, "\t", len(c.TStamp), "\t", s)
 }
 
 func (c *CountTimeCats) Cats() []string {
+	sort.StringSlice(c.Categories).Sort()
 	return c.Categories
+}
+
+type StatSet map[string]*User
+
+func (set *StatSet) Add(line []byte) error {
+	d := *set
+	cookieID, fields := getFields(line)
+	c := new(User{})
+	for _, raw := range bytes.Split(fields, []byte(";")) {
+	}
+}
+
+type User struct {
+	CookieID string
+	Sess     []Session
+}
+
+type Session struct {
+	event []Event
+	file  string
+}
+
+type Event struct {
+	t    time.Time
+	cats []string
 }
 
 type CountTimeCatsSet map[string]*CountTimeCats
 
 func (set *CountTimeCatsSet) Add(line []byte) error {
 	d := *set
-	fields := getFields(line)
-	cookieID := string(fields[0])
+	cookieID, fields := getFields(line)
 	c := &CountTimeCats{}
-	for _, raw := range bytes.Split(fields[1], []byte(";")) {
+	for _, raw := range bytes.Split(fields, []byte(";")) {
 		rawCats := bytes.Split(raw, []byte(":"))
 		stamp, err := bytesconv.ParseInt(rawCats[0], 10, 64)
 		cats := bytes.Split(rawCats[1], []byte(","))
@@ -134,6 +182,7 @@ func (set *CountTimeCatsSet) Add(line []byte) error {
 		cookie.Categories = append(cookie.Categories, c.Categories...)
 		cookie.CookieId = cookieID
 	} else {
+		log.Println("fistTimeSeen", c)
 		d[cookieID] = c
 	}
 	return nil
@@ -191,10 +240,9 @@ type CountTimeSet map[string]*CountTime
 
 func (set *CountTimeSet) Add(line []byte) error {
 	d := *set
-	fields := getFields(line)
-	cookieID := string(fields[0])
+	cookieID, fields := getFields(line)
 	c := &CountTime{}
-	for _, raw := range bytes.Split(fields[1], []byte(";")) {
+	for _, raw := range bytes.Split(fields, []byte(";")) {
 		rawStamp := bytes.Split(raw, []byte(":"))[0]
 		stamp, err := bytesconv.ParseInt(rawStamp, 10, 64)
 		if err != nil {
@@ -281,8 +329,8 @@ func (set *Intersection) Init() {
 }
 func (set *Intersection) Add(line []byte) error {
 	d := *set
-	fields := getFields(line)
-	d[string(fields[0])] = struct{}{}
+	cookieID, _ := getFields(line)
+	d[cookieID] = struct{}{}
 	return nil
 }
 
@@ -327,8 +375,9 @@ func FillDb(scanner *bufio.Scanner, d Shard) Shard {
 	return d
 }
 
-func getFields(line []byte) [][]byte {
-	return bytes.Split(line, []byte("\t"))
+func getFields(line []byte) (cookieID string, fields []byte) {
+	fields := bytes.Split(line, []byte("\t"))
+	return string(fields[0]), fields[1]
 }
 
 //ReadShard reads the file pointed to by shardName and returns the it as a dataset
@@ -374,4 +423,10 @@ func init() {
 	gob.Register(&CountTimeSet{})
 	gob.Register(&Intersection{})
 	gob.Register(&CountTimeCatsSet{})
+	f, err := os.Create("log.txt")
+	if err != nil {
+		panic(err)
+	}
+	log.SetOutput(f)
+	log.Println("testing")
 }
