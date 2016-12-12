@@ -14,6 +14,7 @@ var sampleSize = flag.Int("sampleSize", 100, "number of cookies that we find inf
 var countFlag = flag.Bool("count", true, "count the number of times a cookie exists in the data set")
 var catFlag = flag.Bool("cat", true, "get the number of categories")
 var time = flag.Bool("time", true, "show the timestamps for the user")
+var all = flag.Bool("all", true, "show everything")
 var firstDir = flag.String("intersection", "", "dir that holds the files to witch cookie ids to check the dataset for")
 var thirdDir = flag.String("dataset", "", "dir that holds the files from which the data set should be created")
 
@@ -27,7 +28,9 @@ type dataset struct {
 
 func (s *dataset) setSample(size int) {
 	s.sampleSize = size
+	fmt.Println("in setSample")
 	for i := 0; i < size; i++ {
+		fmt.Println(s.shards)
 		r := s.randomElement(s.shards[0])
 		s.sample = append(s.sample, r)
 	}
@@ -77,7 +80,6 @@ func (s *dataset) countTime() []cookieDb.CountTime {
 			if c := s.loadedShard.Get(cookie.Id()); c != nil {
 				ct[i].Count += c.Count()
 				ct[i].TStamp = append(ct[i].TStamp, c.Time()...)
-				fmt.Println(c)
 			}
 		}
 	}
@@ -94,11 +96,23 @@ func (s *dataset) countTimeCats() []cookieDb.CountTimeCats {
 				ct[i].TStamp = append(ct[i].TStamp, c.Time()...)
 				ct[i].Categories = append(ct[i].Categories, c.Cats()...)
 				ct[i].CookieId = cookie.Id()
-				log.Println("shard:", shard, &ct[i], "|", c)
 			}
 		}
 	}
 	return ct
+}
+
+func (s *dataset) all() []cookieDb.User {
+	cookies := make([]cookieDb.User, s.sampleSize)
+	for _, shard := range s.shards {
+		s.loadShard(shard)
+		for i, cookie := range s.sample {
+			if c := s.loadedShard.Get(cookie.Id()); c != nil {
+				cookies[i].Sess = append(cookies[i].Sess, c.User().Sess...)
+			}
+		}
+	}
+	return cookies
 }
 
 var errors *log.Logger
@@ -123,6 +137,9 @@ func main() {
 	if *countFlag && *time && !*catFlag {
 		set := make(cookieDb.CountTimeSet)
 		d = &set
+	} else if *all {
+		set := make(cookieDb.StatSet)
+		d = &set
 	} else if *catFlag {
 		set := make(cookieDb.CountTimeCatsSet)
 		d = &set
@@ -132,7 +149,7 @@ func main() {
 	}
 	set := makeShards(datasetFileNames, d)
 	set.setSample(*sampleSize)
-	c := set.countTimeCats()
+	c := set.all()
 	f, err := os.Create("output.txt")
 	if err != nil {
 		errors.Fatal(err)
@@ -159,7 +176,7 @@ func makeShards(fileNames []string, d cookieDb.Shard) (set *dataset) {
 			if err != nil {
 				panic(err)
 			}
-			d = cookieDb.FillDb(bufio.NewScanner(f), d)
+			d = cookieDb.FillDb(bufio.NewScanner(f), d, shardName)
 			f.Close()
 			if err := cookieDb.WriteShard(shardName, d); err != nil {
 				log.Println(err)
