@@ -8,10 +8,10 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/segmentio/objconv/bytesconv"
-	"strings"
 )
 
 //Shard abstracts the dataype that can depend on the analysis needed
@@ -132,7 +132,7 @@ func getCats(rawCats []byte) (cats []string) {
 	}
 	return
 }
-func getEvent(rawEvent []byte) (e Event) {
+func getEvent(rawEvent []byte, fileTime *time.Time) (e Event) {
 	rawData := bytes.Split(rawEvent, []byte(":"))
 	stamp, err := bytesconv.ParseInt(rawData[0], 10, 64)
 	if err != nil {
@@ -140,20 +140,27 @@ func getEvent(rawEvent []byte) (e Event) {
 	}
 	e.T = time.Unix(stamp, 0)
 	e.Cats = getCats(rawData[1])
+	e.His = e.Hist(fileTime)
 	return
 }
 
-func getEvents(fields []byte) (e []Event) {
+func getEvents(fields []byte, fileTime *time.Time) (e []Event) {
 	for _, rawEvent := range bytes.Split(fields, []byte(";")) {
-		e = append(e, getEvent(rawEvent))
+		e = append(e, getEvent(rawEvent, fileTime))
 	}
 	return
 }
 
-func getSession(line []byte) (*Session, string) {
+func getSession(line []byte, fileTime *time.Time) (*Session, string) {
 	id, fields := getFields(line)
 	s := new(Session)
-	s.Events = getEvents(fields)
+	s.Events = getEvents(fields, fileTime)
+	for _, e := range s.Events {
+		if e.His {
+			s.Hist = true
+			break
+		}
+	}
 	return s, id
 }
 
@@ -161,7 +168,8 @@ type StatSet map[string]*User
 
 func (set *StatSet) Add(line []byte, fileName string) error {
 	d := *set
-	sess, cookieID := getSession(line)
+	fileTime := parseTime(fileName)
+	sess, cookieID := getSession(line, &fileTime)
 	sess.File = fileName
 	if user, ok := d[cookieID]; ok {
 		user.Sess = append(user.Sess, *sess)
@@ -251,12 +259,13 @@ func (u *User) User() *User {
 type Session struct {
 	Events []Event
 	File   string
+	Hist   bool
 }
 
 func (s *Session) String() string {
-	str := "Session from file: " + s.File + "\n"
+	str := "Session from file: " + s.File + " Hist " + fmt.Sprint(s.Hist) + "\n"
 	for _, e := range s.Events {
-		str += fmt.Sprintf("\tevent: { time: %s, cats: %+v", e.T.In(LOC).Format(time.Stamp), e.Cats)
+		str += fmt.Sprintf("\tevent: { hist: %+v, time: %s, cats: %+v", e.His, e.T.In(LOC).Format(time.Stamp), e.Cats)
 	}
 	return str
 }
@@ -264,16 +273,24 @@ func (s *Session) String() string {
 type Event struct {
 	T    time.Time
 	Cats []string
+	His  bool
 }
 
 func (e Event) Hist(t *time.Time) bool {
-	return e.T.Hour() == t.Hour()
+	if e.T.In(LOC).Year() == t.Year() {
+		if e.T.In(LOC).Month() == t.Month() {
+			if e.T.In(LOC).Day() == t.Day() {
+				return !(e.T.In(LOC).Hour() == t.Hour())
+			}
+		}
+	}
+	return true
 }
 
 func parseTime(fileName string) time.Time {
 	t := strings.Split(fileName, "_")[1]
 	timeStr := strings.Split(t, ".")[0]
-	ret, err := time.ParseInLocation("2006010215", timeStr, LOC)
+	ret, err := time.Parse("2006010215", timeStr)
 	if err != nil {
 		panic(err)
 	}
