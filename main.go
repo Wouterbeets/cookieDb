@@ -25,7 +25,7 @@ type dataset struct {
 	sample        []cookieDb.Cookie
 	sampleSize    int
 	loadedShard   cookieDb.Shard
-	loadedShardId string
+	loadedShardID string
 }
 
 func (s *dataset) setSample(size int) {
@@ -43,13 +43,13 @@ func (s *dataset) randomElement(shardName string) cookieDb.Cookie {
 }
 
 func (s *dataset) loadShard(name string) {
-	if s.loadedShardId != name {
+	if s.loadedShardID != name {
 		shard, err := cookieDb.ReadShard(name)
 		if err != nil {
 			log.Println("Error while loading shard", err)
 		}
 		s.loadedShard = shard
-		s.loadedShardId = name
+		s.loadedShardID = name
 	}
 }
 
@@ -63,9 +63,9 @@ func (s *dataset) count() []count {
 	for _, shard := range s.shards {
 		s.loadShard(shard)
 		for i, cookie := range s.sample {
-			if c := s.loadedShard.Get(cookie.Id()); c != nil {
+			if c := s.loadedShard.Get(cookie.ID()); c != nil {
 				counts[i].count += c.Count()
-				counts[i].id = cookie.Id()
+				counts[i].id = cookie.ID()
 			}
 		}
 	}
@@ -77,7 +77,7 @@ func (s *dataset) countTime() []cookieDb.CountTime {
 	for _, shard := range s.shards {
 		s.loadShard(shard)
 		for i, cookie := range s.sample {
-			if c := s.loadedShard.Get(cookie.Id()); c != nil {
+			if c := s.loadedShard.Get(cookie.ID()); c != nil {
 				ct[i].Count += c.Count()
 				ct[i].TStamp = append(ct[i].TStamp, c.Time()...)
 			}
@@ -91,11 +91,11 @@ func (s *dataset) countTimeCats() []cookieDb.CountTimeCats {
 	for _, shard := range s.shards {
 		s.loadShard(shard)
 		for i, cookie := range s.sample {
-			if c := s.loadedShard.Get(cookie.Id()); c != nil {
+			if c := s.loadedShard.Get(cookie.ID()); c != nil {
 				ct[i].Counter += c.Count()
 				ct[i].TStamp = append(ct[i].TStamp, c.Time()...)
 				ct[i].Categories = append(ct[i].Categories, c.Cats()...)
-				ct[i].CookieId = cookie.Id()
+				ct[i].CookieID = cookie.ID()
 			}
 		}
 	}
@@ -107,9 +107,9 @@ func (s *dataset) all() []cookieDb.User {
 	for _, shard := range s.shards {
 		s.loadShard(shard)
 		for i, cookie := range s.sample {
-			if c := s.loadedShard.Get(cookie.Id()); c != nil {
+			if c := s.loadedShard.Get(cookie.ID()); c != nil {
 				cookies[i].Sess = append(cookies[i].Sess, c.User().Sess...)
-				cookies[i].CookieID = cookie.Id()
+				cookies[i].CookieID = cookie.ID()
 			}
 		}
 	}

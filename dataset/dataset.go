@@ -21,12 +21,12 @@ type Shard interface {
 	Init()
 	Type() string
 	GetElems(nr int) []Cookie
-	Get(cookieId string) Cookie
+	Get(cookieID string) Cookie
 }
 
 type Cookie interface {
 	String() string
-	Id() string
+	ID() string
 	Count() int
 	Time() []time.Time
 	Cats() []string
@@ -39,7 +39,7 @@ func (c cookieInter) String() string {
 	return string(c)
 }
 
-func (c cookieInter) Id() string {
+func (c cookieInter) ID() string {
 	return string(c)
 }
 
@@ -68,7 +68,7 @@ func (c cookieCountTime) String() string {
 	return c.id + fmt.Sprintln(c.Ct)
 }
 
-func (c cookieCountTime) Id() string {
+func (c cookieCountTime) ID() string {
 	return c.id
 }
 
@@ -92,7 +92,7 @@ type CountTimeCats struct {
 	Counter    int
 	TStamp     []time.Time
 	Categories []string
-	CookieId   string
+	CookieID   string
 }
 
 func (c *CountTimeCats) Count() int {
@@ -103,8 +103,8 @@ func (c *CountTimeCats) Time() []time.Time {
 	return c.TStamp
 }
 
-func (c *CountTimeCats) Id() string {
-	return c.CookieId
+func (c *CountTimeCats) ID() string {
+	return c.CookieID
 }
 
 func (c *CountTimeCats) String() string {
@@ -113,7 +113,7 @@ func (c *CountTimeCats) String() string {
 		s += t.In(time.UTC).Format(time.Stamp) + ", "
 	}
 	s += "]"
-	return fmt.Sprint(len(c.Categories), "\t", c.CookieId, "\t", c.Categories, "\t", c.Counter, "\t", len(c.TStamp), "\t", s)
+	return fmt.Sprint(len(c.Categories), "\t", c.CookieID, "\t", c.Categories, "\t", c.Counter, "\t", len(c.TStamp), "\t", s)
 }
 
 func (c *CountTimeCats) Cats() []string {
@@ -217,9 +217,9 @@ func (set *StatSet) GetElems(nr int) []Cookie {
 	return ret
 }
 
-func (set *StatSet) Get(cookieId string) Cookie {
+func (set *StatSet) Get(cookieID string) Cookie {
 	d := *set
-	if val, ok := d[cookieId]; ok {
+	if val, ok := d[cookieID]; ok {
 		return val
 	}
 	return nil
@@ -239,7 +239,7 @@ func (u *User) String() string {
 	}
 	return s
 }
-func (u *User) Id() string {
+func (u *User) ID() string {
 	return u.CookieID
 }
 
@@ -361,13 +361,13 @@ func (set *CountTimeCatsSet) Add(line []byte, fileName string) error {
 		c.TStamp = append(c.TStamp, unixStamp)
 		c.Counter = 1
 		c.Categories = append(c.Categories, categories...)
-		c.CookieId = cookieID
+		c.CookieID = cookieID
 	}
 	if cookie, ok := d[cookieID]; ok {
 		cookie.TStamp = append(cookie.TStamp, c.TStamp...)
 		cookie.Counter++
 		cookie.Categories = append(cookie.Categories, c.Categories...)
-		cookie.CookieId = cookieID
+		cookie.CookieID = cookieID
 	} else {
 		log.Println("fistTimeSeen", c)
 		d[cookieID] = c
@@ -375,10 +375,10 @@ func (set *CountTimeCatsSet) Add(line []byte, fileName string) error {
 	return nil
 }
 
-func (d *CountTimeCatsSet) String() string {
+func (set *CountTimeCatsSet) String() string {
 	s := ""
 	i := 0
-	for key, val := range *d {
+	for key, val := range *set {
 		s += fmt.Sprint(key, " ", val.TStamp, " ", val.Categories)
 		i++
 		if i == 100 {
@@ -389,22 +389,22 @@ func (d *CountTimeCatsSet) String() string {
 	return s
 }
 
-func (d *CountTimeCatsSet) Type() string {
+func (set *CountTimeCatsSet) Type() string {
 	return "CountTimeCatsSet"
 }
 
-func (d *CountTimeCatsSet) Size() int {
-	return len(*d)
+func (set *CountTimeCatsSet) Size() int {
+	return len(*set)
 }
 
-func (d *CountTimeCatsSet) Init() {
-	*d = make(CountTimeCatsSet)
+func (set *CountTimeCatsSet) Init() {
+	*set = make(CountTimeCatsSet)
 }
 
-func (d *CountTimeCatsSet) GetElems(nr int) []Cookie {
+func (set *CountTimeCatsSet) GetElems(nr int) []Cookie {
 	i := 0
 	ret := make([]Cookie, 0, nr)
-	for _, val := range *d {
+	for _, val := range *set {
 		if i == nr {
 			break
 		}
@@ -414,9 +414,9 @@ func (d *CountTimeCatsSet) GetElems(nr int) []Cookie {
 	return ret
 }
 
-func (set *CountTimeCatsSet) Get(cookieId string) Cookie {
+func (set *CountTimeCatsSet) Get(cookieID string) Cookie {
 	d := *set
-	if val, ok := d[cookieId]; ok {
+	if val, ok := d[cookieID]; ok {
 		return Cookie(val)
 	}
 	return nil
@@ -447,32 +447,32 @@ func (set *CountTimeSet) Add(line []byte, fileName string) error {
 	return nil
 }
 
-func (d *CountTimeSet) String() string {
+func (set *CountTimeSet) String() string {
 	s := ""
-	for key, val := range *d {
+	for key, val := range *set {
 		s += fmt.Sprint(key, " ", val.TStamp, " ")
 	}
 	s += fmt.Sprintln()
 	return s
 }
 
-func (d *CountTimeSet) Type() string {
+func (set *CountTimeSet) Type() string {
 	return "CountTimeSet"
 }
 
-func (d *CountTimeSet) Size() int {
-	return len(*d)
+func (set *CountTimeSet) Size() int {
+	return len(*set)
 }
 
-func (d *CountTimeSet) Init() {
-	*d = make(CountTimeSet)
-	fmt.Println(d.Size())
+func (set *CountTimeSet) Init() {
+	*set = make(CountTimeSet)
+	fmt.Println(set.Size())
 }
 
-func (d *CountTimeSet) GetElems(nr int) []Cookie {
+func (set *CountTimeSet) GetElems(nr int) []Cookie {
 	i := 0
 	ret := make([]Cookie, 0, nr)
-	for key, val := range *d {
+	for key, val := range *set {
 		if i == nr {
 			break
 		}
@@ -482,10 +482,10 @@ func (d *CountTimeSet) GetElems(nr int) []Cookie {
 	return ret
 }
 
-func (set *CountTimeSet) Get(cookieId string) Cookie {
+func (set *CountTimeSet) Get(cookieID string) Cookie {
 	d := *set
-	if val, ok := d[cookieId]; ok {
-		return Cookie(cookieCountTime{cookieId, *val})
+	if val, ok := d[cookieID]; ok {
+		return Cookie(cookieCountTime{cookieID, *val})
 	}
 	return nil
 }
@@ -506,7 +506,7 @@ func (c CountTime) String() string {
 
 type Intersection map[string]struct{}
 
-func (d *Intersection) Type() string {
+func (set *Intersection) Type() string {
 	return "Intersection"
 }
 
@@ -520,19 +520,19 @@ func (set *Intersection) Add(line []byte, fileName string) error {
 	return nil
 }
 
-func (d *Intersection) Size() int {
-	return len(*d)
+func (set *Intersection) Size() int {
+	return len(*set)
 }
 
-func (d *Intersection) String() string {
-	return fmt.Sprint(map[string]struct{}(*d))
+func (set *Intersection) String() string {
+	return fmt.Sprint(map[string]struct{}(*set))
 }
 
 func (set *Intersection) GetElems(nr int) []Cookie {
 	d := *set
 	i := 0
 	ret := make([]Cookie, 0, nr)
-	for key, _ := range d {
+	for key := range d {
 		if i == nr {
 			break
 		}
@@ -543,10 +543,10 @@ func (set *Intersection) GetElems(nr int) []Cookie {
 
 }
 
-func (set *Intersection) Get(cookieId string) Cookie {
+func (set *Intersection) Get(cookieID string) Cookie {
 	d := *set
-	if _, ok := d[cookieId]; ok {
-		return Cookie(cookieInter(cookieId))
+	if _, ok := d[cookieID]; ok {
+		return Cookie(cookieInter(cookieID))
 	}
 	return nil
 }
