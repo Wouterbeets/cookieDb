@@ -110,7 +110,7 @@ func (c *CountTimeCats) Id() string {
 func (c *CountTimeCats) String() string {
 	s := "["
 	for _, t := range c.TStamp {
-		s += t.In(LOC).Format(time.Stamp) + ", "
+		s += t.In(time.UTC).Format(time.Stamp) + ", "
 	}
 	s += "]"
 	return fmt.Sprint(len(c.Categories), "\t", c.CookieId, "\t", c.Categories, "\t", c.Counter, "\t", len(c.TStamp), "\t", s)
@@ -166,9 +166,22 @@ func getSession(line []byte, fileTime *time.Time) (*Session, string) {
 
 type StatSet map[string]*User
 
+func (set *StatSet) String() string {
+	i := 0
+	s := ""
+	for _, val := range *set {
+		s += fmt.Sprintln(val.CookieID) + "\n"
+		i++
+		if i == 100 {
+			break
+		}
+	}
+	return s
+}
+
 func (set *StatSet) Add(line []byte, fileName string) error {
 	d := *set
-	fileTime := parseTime(fileName)
+	fileTime := ParseTime(fileName)
 	sess, cookieID := getSession(line, &fileTime)
 	sess.File = fileName
 	if user, ok := d[cookieID]; ok {
@@ -215,13 +228,14 @@ func (set *StatSet) Get(cookieId string) Cookie {
 type User struct {
 	CookieID string
 	Sess     []Session
+	Current  bool
 }
 
 func (u *User) String() string {
 	s := "User: \n\t"
-	s += "id: " + u.CookieID + " "
+	s += "id: " + u.CookieID + "\n\t"
 	for _, sess := range u.Sess {
-		s += "\t" + sess.String()
+		s += sess.String() + "\n\t"
 	}
 	return s
 }
@@ -256,41 +270,70 @@ func (u *User) User() *User {
 	return u
 }
 
+func (u *User) SetCurrent(startTime, endTime time.Time) bool {
+	for _, s := range u.Sess {
+		if s.setCurrent(startTime, endTime) {
+			u.Current = true
+		}
+	}
+	return u.Current
+}
+
 type Session struct {
-	Events []Event
-	File   string
-	Hist   bool
+	Events  []Event
+	File    string
+	Hist    bool
+	Current bool
+}
+
+func (s *Session) setCurrent(startTime, endTime time.Time) bool {
+	for _, e := range s.Events {
+		if e.setCurrent(startTime, endTime) {
+			s.Current = true
+		}
+	}
+	return s.Current
 }
 
 func (s *Session) String() string {
 	str := "Session from file: " + s.File + " Hist " + fmt.Sprint(s.Hist) + "\n"
 	for _, e := range s.Events {
-		str += fmt.Sprintf("\tevent: { hist: %+v, time: %s, cats: %+v", e.His, e.T.In(LOC).Format(time.Stamp), e.Cats)
+		str += fmt.Sprintf("\t\tevent: { hist: %+v, time: %s, cats: %+v\n", e.His, e.T.In(LOC).Format(time.Stamp), e.Cats)
 	}
 	return str
 }
 
 type Event struct {
-	T    time.Time
-	Cats []string
-	His  bool
+	T       time.Time
+	Cats    []string
+	His     bool
+	Current bool
 }
 
 func (e Event) Hist(t *time.Time) bool {
-	if e.T.In(LOC).Year() == t.Year() {
-		if e.T.In(LOC).Month() == t.Month() {
-			if e.T.In(LOC).Day() == t.Day() {
-				return !(e.T.In(LOC).Hour() == t.Hour())
+	if e.T.In(LOC).Year() == t.In(LOC).Year() {
+		if e.T.In(LOC).Month() == t.In(LOC).Month() {
+			if e.T.In(LOC).Day() == t.In(LOC).Day() {
+				return !(e.T.In(LOC).Hour() == t.In(LOC).Hour())
 			}
 		}
 	}
 	return true
 }
 
-func parseTime(fileName string) time.Time {
+func (e *Event) setCurrent(startTime, endTime time.Time) bool {
+	if e.T.Before(endTime) && e.T.After(startTime) {
+		e.Current = true
+		return true
+	}
+	e.Current = false
+	return false
+}
+
+func ParseTime(fileName string) time.Time {
 	t := strings.Split(fileName, "_")[1]
 	timeStr := strings.Split(t, ".")[0]
-	ret, err := time.Parse("2006010215", timeStr)
+	ret, err := time.ParseInLocation("2006010215", timeStr, LOC)
 	if err != nil {
 		panic(err)
 	}

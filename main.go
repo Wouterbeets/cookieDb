@@ -8,15 +8,17 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 )
 
 var sampleSize = flag.Int("sampleSize", 100, "number of cookies that we find information about throughout the dataset")
 var countFlag = flag.Bool("count", true, "count the number of times a cookie exists in the data set")
 var catFlag = flag.Bool("cat", true, "get the number of categories")
-var time = flag.Bool("time", true, "show the timestamps for the user")
+var times = flag.Bool("time", true, "show the timestamps for the user")
 var all = flag.Bool("all", true, "show everything")
 var firstDir = flag.String("intersection", "", "dir that holds the files to witch cookie ids to check the dataset for")
 var thirdDir = flag.String("dataset", "", "dir that holds the files from which the data set should be created")
+var timeFrame = flag.Int("timeFrame", 2, "Number of hours before the date in the name of the file that a cookie will be considered new data and not history")
 
 type dataset struct {
 	shards        []string
@@ -28,9 +30,7 @@ type dataset struct {
 
 func (s *dataset) setSample(size int) {
 	s.sampleSize = size
-	fmt.Println("in setSample")
 	for i := 0; i < size; i++ {
-		fmt.Println(s.shards)
 		r := s.randomElement(s.shards[0])
 		s.sample = append(s.sample, r)
 	}
@@ -109,6 +109,7 @@ func (s *dataset) all() []cookieDb.User {
 		for i, cookie := range s.sample {
 			if c := s.loadedShard.Get(cookie.Id()); c != nil {
 				cookies[i].Sess = append(cookies[i].Sess, c.User().Sess...)
+				cookies[i].CookieID = cookie.Id()
 			}
 		}
 	}
@@ -134,7 +135,7 @@ func main() {
 		}
 	}
 	var d cookieDb.Shard
-	if *countFlag && *time && !*catFlag {
+	if *countFlag && *times && !*catFlag {
 		set := make(cookieDb.CountTimeSet)
 		d = &set
 	} else if *all {
@@ -150,14 +151,21 @@ func main() {
 	set := makeShards(datasetFileNames, d)
 	set.setSample(*sampleSize)
 	c := set.all()
+	endTime := cookieDb.ParseTime(datasetFileNames[0]).Add(time.Duration(time.Hour))
+	startTime := endTime.Add(time.Duration(time.Hour * time.Duration(*timeFrame+1) * -1))
 	f, err := os.Create("output.txt")
 	if err != nil {
 		errors.Fatal(err)
 	}
 	out := log.New(f, "", 0)
+	count := 0
 	for _, s := range c {
+		if s.SetCurrent(startTime, endTime) {
+			count++
+		}
 		out.Println(&s)
 	}
+	fmt.Println(float64(count) / float64(*sampleSize))
 }
 
 func shardAlreadyMade(shardName string) bool {
